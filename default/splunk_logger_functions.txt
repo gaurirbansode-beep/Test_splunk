@@ -1,0 +1,63 @@
+# Extracted Splunk logger functions
+
+def debug(msg: object, data: object = None):
+    logger.log_event(__get_event("DEBUG", msg, data))
+
+def info(msg: object, data: object = None):
+    logger.log_event(__get_event("INFO", msg, data))
+
+def warn(msg: object, data: object = None):
+    logger.log_event(__get_event("WARN", msg, data))
+
+def error(msg: object, data: object = None):
+    logger.log_event(__get_event("ERROR", msg, data))
+
+def fatal(msg: object, data: object = None):
+    logger.log_event(__get_event("FATAL", msg, data))
+
+def logging_wrapper(task, error_msg):
+    def inner(func):
+        def wrapper(*args, **kwargs):
+            try:
+                info(
+                    f"Wrapper starting {task}",
+                    data={"task": task, "state": STATE_STARTED},
+                )
+                df = func(*args, **kwargs)
+                info(
+                    f"Wrapper finished {task}",
+                    data={"task": task, "state": STATE_FINISHED},
+                )
+                return df
+            except AnalysisException as e:
+                error(
+                    error_msg,
+                    data={"task": task, "dump": str(e), "state": STATE_ERROR},
+                )
+                if str(e).startswith("Path does not exist:"):
+                    raise SourceEmptyException()
+                else:
+                    raise
+            except:
+                e = sys.exc_info()[0]
+                error(
+                    error_msg, data={"task": task, "dump": str(e), "state": STATE_ERROR}
+                )
+                raise
+
+        return wrapper
+
+    return inner
+
+
+# Structured JSON Output
+{
+  "repository_processed": "gaurirbansode-beep/Test_splunk",
+  "source_file": "splunk_logger_functions.txt",
+  "total_functions_detected": 6,
+  "splunk_functions_count": 6,
+  "non_splunk_functions_count": 0,
+  "output_repository": "gaurirbansode-beep/Test_splunk",
+  "output_file": "splunk_logger_functions.txt",
+  "status": "SUCCESS"
+}
