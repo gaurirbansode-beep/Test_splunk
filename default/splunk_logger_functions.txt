@@ -1,7 +1,6 @@
 # Extracted Splunk logger functions
 
 def __Get_t(log_level, msg, data=None):
-    # adding log level and msg to event
     event = {"level": log_level, "message": msg}
     if isinstance(data, dict):
         event.update(data)
@@ -54,110 +53,5 @@ def logging_wrapper(task, error_msg):
                     error_msg, data={"task": task, "dump": str(e), "state": STATE_ERROR}
                 )
                 raise
-
         return wrapper
-
     return inner
-
-def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
-    if log_data["df_count"] != 0:
-        (
-            df.write.mode("overwrite")
-            .option("compression", "snappy")
-            .parquet(destination_path)
-        )
-    else:
-        error(
-            "Could not write to destination as dataframe having zero records",
-            data={
-                "task": log_data["task"],
-                "dest": destination_path,
-                "state": STATE_ERROR,
-            },
-        )
-        raise Exception(
-            "Could not write to destination as dataframe having zero records"
-        )
-
-def log_and_write_parquet_data(
-    df: DataFrame, destination_path: str, log_data: dict
-) -> None:
-    try:
-        info(
-            f"Uploading {log_data['job_name']}",
-            data={
-                "dest": destination_path,
-                "task": log_data["task"],
-                "state": STATE_STARTED,
-            },
-        )
-        upload_count = df.count()
-        log_data["df_count"] = upload_count
-        write_parquet_data(df, destination_path, log_data)
-        info(
-            f"Done uploading {log_data['job_name']}",
-            data={
-                "task": log_data["task"],
-                "state": STATE_FINISHED,
-                "rows": upload_count,
-                "document_type": log_data.get(
-                    "document_type", "Not Applicable For this job"
-                ),
-            },
-        )
-        logger.flush()
-    except Exception as e:
-        error(
-            "Could not write to destination",
-            data={
-                "task": log_data["task"],
-                "dest": destination_path,
-                "dump": str(e),
-                "state": STATE_ERROR,
-            },
-        )
-        raise e
-
-def log_and_write_delta_table(
-    df: DataFrame, destination: str, log_data: dict
-) -> None:
-    try:
-        info(
-            f"Writing delta table at {destination}",
-            data={
-                "task": log_data["task"],
-                "destination": destination,
-                "state": STATE_STARTED,
-            },
-        )
-        upload_count = df.count()
-        log_data["df_count"] = upload_count
-        write_delta_table(log_data, df, destination)
-        logger.flush()
-    except Exception as e:
-        error(
-            f"Could not write to {destination}",
-            data={
-                "task": log_data["task"],
-                "dest": destination,
-                "dump": str(e),
-                "state": STATE_ERROR,
-            },
-        )
-        raise e
-
-def write_unity_data(df: DataFrame, destination_path: str, log_data: dict,mode:str ="overwrite") -> None:
-    if log_data["df_count"] != 0:
-        df.write.format("delta").mode(mode).option("overwriteSchema", "true").saveAsTable(destination_path)
-    else:
-        error(
-            "Could not write to destination as dataframe having zero records",
-            data={
-                "task": log_data["task"],
-                "dest": destination_path,
-                "state": STATE_ERROR,
-            },
-        )
-        raise Exception(
-            "Could not write to destination as dataframe having zero records"
-        )
