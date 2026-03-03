@@ -9,17 +9,38 @@ def connect_service():
                           username="admin", password="changeme")
 
 
-def build_search_query(index, keyword):
-    return f"search index={index} {keyword} | stats count"
-
-
 def submit_event(message):
-    service = connect_service()
-    service.indexes["main"].submit(message)
+    svc = connect_service()
+    svc.indexes["main"].submit(message)
+
+
+def execute_search(query):
+    svc = connect_service()
+    return svc.jobs.create(query)
+
+
+def build_error_query():
+    return "search index=main ERROR | stats count"
+
+
+def run_error_search():
+    return execute_search(build_error_query())
 
 
 def calculate_sum(a, b):
     return a + b
+
+
+def calculate_difference(a, b):
+    return a - b
+
+
+def calculate_product(a, b):
+    return a * b
+
+
+def calculate_division(a, b):
+    return a / b if b else None
 
 
 def generate_random_number():
@@ -30,19 +51,39 @@ def format_payload(data):
     return json.dumps(data)
 
 
-def execute_search(query):
-    service = connect_service()
-    return service.jobs.create(query)
-
-
 def log_local_info(message):
     logging.getLogger("app").info(message)
+
+
+def log_local_error(message):
+    logging.getLogger("app").error(message)
 
 
 def create_event(user, action):
     return {"user": user, "action": action}
 
 
-def handle_and_submit(user, action):
-    event = create_event(user, action)
-    submit_event(format_payload(event))
+def process_event(user, action):
+    evt = create_event(user, action)
+    submit_event(format_payload(evt))
+
+
+def filter_even(numbers):
+    return [n for n in numbers if n % 2 == 0]
+
+
+def filter_odd(numbers):
+    return [n for n in numbers if n % 2 != 0]
+
+
+def uppercase_text(text):
+    return text.upper()
+
+
+def lowercase_text(text):
+    return text.lower()
+
+
+def check_threshold(value, limit):
+    return value > limit
+
