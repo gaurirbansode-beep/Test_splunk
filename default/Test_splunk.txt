@@ -1,143 +1,110 @@
 # Extracted Splunk logger functions
 
-def __Get_t(log_level, msg, data=None):
-    event = {"level": log_level, "message": msg}
-    if isinstance(data, dict):
-        event.update(data)
-    elif isinstance(data, str) and data.strip():
-        event["data"] = data
-    event.update(log_data)
-    return json.dumps(event)
+def initialize_service():
+    return client.connect(host="localhost", port=8089, username="admin", password="changeme")
 
-def debug(msg: object, data: object = None):
-    logger.log_event(__get_event("DEBUG", msg, data))
+def build_query(index, condition):
+    return f"search index={index} {condition}"
 
-def info(msg: object, data: object = None):
-    logger.log_event(__get_event("INFO", msg, data))
+def submit_event(message):
+    svc = initialize_service()
+    svc.indexes["main"].submit(message)
 
-def warn(msg: object, data: object = None):
-    logger.log_event(__get_event("WARN", msg, data))
+def persist_event(event):
+    submit_event(json.dumps(event))
 
-def error(msg: object, data: object = None):
-    logger.log_event(__get_event("ERROR", msg, data))
+def execute_search(query):
+    svc = initialize_service()
+    return svc.jobs.create(query)
 
-def fatal(msg: object, data: object = None):
-    logger.log_event(__get_event("FATAL", msg, data))
+def search_error_events():
+    q = "search index=main ERROR | stats count"
+    return execute_search(q)
 
-def logging_wrapper(task, error_msg):
-    def inner(func):
-        def wrapper(*args, **kwargs):
-            try:
-                info(
-                    f"Wrapper starting {task}",
-                    data={"task": task, "state": STATE_STARTED},
-                )
-                df = func(*args, **kwargs)
-                info(
-                    f"Wrapper finished {task}",
-                    data={"task": task, "state": STATE_FINISHED},
-                )
-                return df
-            except AnalysisException as e:
-                error(
-                    error_msg,
-                    data={"task": task, "dump": str(e), "state": STATE_ERROR},
-                )
-                if str(e).startswith("Path does not exist:"):
-                    raise SourceEmptyException()
-                else:
-                    raise
-            except:
-                e = sys.exc_info()[0]
-                error(
-                    error_msg, data={"task": task, "dump": str(e), "state": STATE_ERROR}
-                )
-                raise
+def search_by_host(host):
+    q = f"search index=main host={host} | stats count"
+    return execute_search(q)
 
-        return wrapper
+def search_with_time():
+    q = "search index=main | timechart count"
+    return execute_search(q)
 
-    return inner
+def handle_event(user, action):
+    evt = create_event(user, action)
+    persist_event(evt)
 
-@logging_wrapper(TASK_LOAD_ALPACA, "Could not load alpaca")
-def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
-    return (
-        get_delta_data(alpaca_source)
-        .where(F.col("purposeId").isin(purposes))
-        .select(F.col("deviceId").alias("device_uuid"))
-        .distinct()
-    )
+def conditional_eval(value):
+    q = f"search index=main | eval status=if(count>{value},\"high\",\"low\")"
+    return execute_search(q)
 
-@logging_wrapper(TASK_LOAD_SIMPLEUI, "Could not load simpleui data")
-def load_simpleui_data(simpleui_data_source: str) -> DataFrame:
-    return (
-        get_delta_data(simpleui_data_source)
-        .select(
-            F.col(
-                "printer_id"
-            ).alias("printerId_from_simpleui"),
-            F.col(
-                "app_deployed_uuid"
-            ).alias("appDeployedUUID"),
-        )
-        .distinct()
-        .dropna()
-    )
+def search_with_lookup():
+    q = "search index=main | lookup user_lookup user OUTPUT role"
+    return execute_search(q)
 
-def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
-    if log_data["df_count"] != 0:
-        (
-            df.write.mode("overwrite")
-            .option("compression", "snappy")
-            .parquet(destination_path)
-        )
-    else:
-        error(
-            "Could not write to destination as dataframe having zero records",
-            data={
-                "task": log_data["task"],
-                "dest": destination_path,
-                "state": STATE_ERROR,
-            },
-        )
-        raise Exception(
-            "Could not write to destination as dataframe having zero records"
-        )
+def append_search():
+    q = "search index=main | append [ search index=backup ]"
+    return execute_search(q)
 
-def log_and_write_parquet_data(
-    df: DataFrame, destination_path: str, log_data: dict
-) -> None:
-    try:
-        info(
-            f"Uploading {log_data['job_name']}",
-            data={
-                "dest": destination_path,
-                "task": log_data["task"],
-                "state": STATE_STARTED,
-            },
-        )
-        upload_count = df.count()
-        log_data["df_count"] = upload_count
-        write_parquet_data(df, destination_path, log_data)
-        info(
-            f"Done uploading {log_data['job_name']}",
-            data={
-                "task": log_data["task"],
-                "state": STATE_FINISHED,
-                "rows": upload_count,
-                "document_type": log_data.get(
-                    "document_type", "Not Applicable For this job"
-                ),
-            },
-        )
-        logger.flush()
-    except Exception as e:
-        error(
-            "Could not write to destination",
-            data={
-                "task": log_data["task"],
-                "dest": destination_path,
-                "dump": str(e),
-                "state": STATE_ERROR,
-            },
-        )
-        raise e
+def transaction_search():
+    q = "search index=main | transaction user"
+    return execute_search(q)
+
+def dedup_hosts():
+    q = "search index=main | dedup host"
+    return execute_search(q)
+
+def sort_results():
+    q = "search index=main | sort - count"
+    return execute_search(q)
+
+def rare_hosts():
+    q = "search index=main | rare host"
+    return execute_search(q)
+
+def top_hosts():
+    q = "search index=main | top host"
+    return execute_search(q)
+
+def table_view():
+    q = "search index=main | table host, source"
+    return execute_search(q)
+
+def rex_extract():
+    q = "search index=main | rex \"user=(?<user>\\w+)\""
+    return execute_search(q)
+
+def build_complex_query(index, field):
+    return f"search index={index} | stats count by {field}"
+
+def execute_complex(index, field):
+    return execute_search(build_complex_query(index, field))
+
+def search_custom(condition):
+    q = build_query("main", condition)
+    return execute_search(q)
+
+def aggregate_by_source():
+    q = "search index=main | stats count by source"
+    return execute_search(q)
+
+def aggregate_by_type():
+    q = "search index=main | stats count by sourcetype"
+    return execute_search(q)
+
+def search_metrics():
+    q = "search index=main metric=* | stats avg(value)"
+    return execute_search(q)
+
+def build_error_query():
+    return "search index=main ERROR | table host, source"
+
+def execute_error_table():
+    return execute_search(build_error_query())
+
+def search_last_hour():
+    q = "search index=main earliest=-1h | stats count"
+    return execute_search(q)
+
+def search_today():
+    q = "search index=main earliest=@d | stats count"
+    return execute_search(q)
