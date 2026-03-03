@@ -1,14 +1,4 @@
-#Splunk_logger.py
-
-logger = SplunkLogger(
-    token="",
-    index="",
-    meta_data={
-        "source": job_name,
-        "sourcetype": f"databricks:{source_type}",
-        "host": databricks_host,
-    },
- )
+# Extracted Splunk logger functions
 
 def __Get_t(log_level, msg, data=None):
     # adding log level and msg to event
@@ -129,7 +119,8 @@ def log_and_write_parquet_data(
         raise e
 
 def log_and_write_delta_table(
-    df: DataFrame, destination: str, log_data: dict) -> None:
+    df: DataFrame, destination: str, log_data: dict
+) -> None:
     try:
         info(
             f"Writing delta table at {destination}",
@@ -170,142 +161,3 @@ def write_unity_data(df: DataFrame, destination_path: str, log_data: dict,mode:s
         raise Exception(
             "Could not write to destination as dataframe having zero records"
         )
-
-def write_delta_table(log_data: dict, df: DataFrame, dest_bucket: str) -> None:
-    info(
-        f"Writing delta table at {dest_bucket}",
-        data={"task": log_data["task"], "state": STATE_STARTED},
-    )
-    deltaTable = DeltaTable.forPath(spark, dest_bucket)
-    if "df_count" not in log_data.keys():
-        log_data["df_count"] = df.count()
-    if log_data["df_count"] != 0:
-        df.write.format("delta").mode("overwrite").option(
-            "overwriteSchema", "true"
-        ).save(dest_bucket)
-    else:
-        error(
-            "Could not write to destination. Dataframe has zero records.",
-            data={
-                "task": log_data["task"],
-                "dest": dest_bucket,
-                "state": STATE_ERROR,
-            },
-        )
-        raise Exception("Could not write to destination. Dataframe has zero records.")
-    info(
-        f"Done writing delta table at {dest_bucket}",
-        data={
-            "task": log_data["task"],
-            "state": STATE_FINISHED,
-            "metrics": get_delta_metrics(deltaTable),
-        },
-    )
-    logger.flush()
-    deltaTable.optimize().executeCompaction()
-
-def check_if_delta_exists(dest_bucket: str,check_on: str="s3") -> Optional[bool]:
-    delta_existed = None
-    try:
-        info(
-            f"Checking that delta table exists at {dest_bucket}",
-            data={"task": TASK_CHECK_DELTA_TABLE, "state": STATE_STARTED},
-        )
-        get_delta_data(dest_bucket,check_on)
-        delta_existed = True
-        info(
-            f"Done checking that delta table exists at {dest_bucket}",
-            data={"task": TASK_CHECK_DELTA_TABLE, "state": STATE_FINISHED},
-        )
-    except AnalysisException:
-        delta_existed = False
-        info(
-            f"Delta table does not exist at {dest_bucket}",
-            data={"task": TASK_CHECK_DELTA_TABLE, "state": STATE_FINISHED},
-        )
-    logger.flush()
-    return delta_existed
-
-def delta_merge_file_status_update(
-    dest_bucket: str, input_df: DataFrame, update_columns: list = None
-) -> None:
-    delta_existed = check_if_delta_exists(dest_bucket)
-    if delta_existed:
-        deltaTable = DeltaTable.forPath(spark, dest_bucket)
-        info(
-            f"Upserting into delta table at {dest_bucket}",
-            data={"task": TASK_UPDATE_DELTA_TABLE, "state": STATE_STARTED},
-        )
-        if update_columns:
-            (
-                deltaTable.alias("status")
-                .merge(input_df.alias("updates"), "status.filename = updates.filename")
-                .whenMatchedUpdate(
-                    set={column: f"updates.{column}" for column in update_columns}
-                )
-                .whenNotMatchedInsertAll()
-                .execute()
-            )
-        info(
-            f"Done upserting into delta table at {dest_bucket}",
-            data={
-                "task": TASK_UPDATE_DELTA_TABLE,
-                "state": STATE_FINISHED,
-                "metrics": get_delta_metrics(deltaTable),
-            },
-        )
-        logger.flush()
-        deltaTable.optimize().executeCompaction()
-    elif delta_existed is None:
-        raise Exception("Unable to update delta table")
-    else:
-        df_count = input_df.count()
-        log_data = {"task": TASK_CREATE_DELTA_TABLE, "df_count": df_count}
-        write_delta_table(log_data, input_df, dest_bucket)
-
-def Kuch_V_start(job_name: str, task: str) -> None:
-    info(
-        f"Started {job_name} Job",
-        data={"task": task, "state": STATE_STARTED},
-    )
-    logger.flush()
-
-def log_job_skip(job_name: str, task: str) -> None:
-    info(
-        f"Skipping {job_name} job",
-        data={"task": task, "state": STATE_SKIPPED},
-    )
-    logger.flush()
-
-def Kuch_V_done(job_name: str, task: str) -> None:
-    info(
-        f"Finished {job_name} job",
-        data={"task": task, "state": STATE_FINISHED},
-    )
-    logger.flush()
-
-# Extraction Summary (JSON)
-{
-  "total_functions": 26,
-  "splunk_logger_functions": 19,
-  "non_splunk_functions": 7,
-  "splunk_logger_function_names": [
-    "__Get_t",
-    "debug",
-    "info",
-    "warn",
-    "error",
-    "fatal",
-    "logging_wrapper",
-    "write_parquet_data",
-    "log_and_write_parquet_data",
-    "log_and_write_delta_table",
-    "write_unity_data",
-    "write_delta_table",
-    "check_if_delta_exists",
-    "delta_merge_file_status_update",
-    "Kuch_V_start",
-    "log_job_skip",
-    "Kuch_V_done"
-  ]
-}
