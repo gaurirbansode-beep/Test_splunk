@@ -1,96 +1,10 @@
 # Extracted Splunk logger functions
 
-def splunk_connect():
-    return client.connect(host="localhost", port=8089,
-                          username="admin", password="changeme")
+def info(msg: object, data: object = None):
+    logger.log_event(__get_event("INFO", msg, data))
 
-def splunk_log_event(event):
-    service = splunk_connect()
-    service.indexes["main"].submit(event)
+def error(msg: object, data: object = None):
+    logger.log_event(__get_event("ERROR", msg, data))
 
-def splunk_log_error(error):
-    service = splunk_connect()
-    service.indexes["main"].submit(f"ERROR: {error}")
-
-def splunk_log_warning(warning):
-    service = splunk_connect()
-    service.indexes["main"].submit(f"WARNING: {warning}")
-
-def splunk_log_info(info):
-    service = splunk_connect()
-    service.indexes["main"].submit(f"INFO: {info}")
-
-def splunk_search_all():
-    service = splunk_connect()
-    query = "search index=main | stats count"
-    return service.jobs.create(query)
-
-def splunk_search_by_host():
-    service = splunk_connect()
-    query = "search index=main | stats count by host"
-    return service.jobs.create(query)
-
-def splunk_search_errors():
-    service = splunk_connect()
-    query = "search index=main ERROR | stats count"
-    return service.jobs.create(query)
-
-def splunk_timechart():
-    service = splunk_connect()
-    query = "search index=main | timechart count"
-    return service.jobs.create(query)
-
-def splunk_top_hosts():
-    service = splunk_connect()
-    query = "search index=main | top host"
-    return service.jobs.create(query)
-
-def splunk_rare_events():
-    service = splunk_connect()
-    query = "search index=main | rare host"
-    return service.jobs.create(query)
-
-def splunk_eval_example():
-    service = splunk_connect()
-    query = "search index=main | eval status=if(count>10,\"high\",\"low\")"
-    return service.jobs.create(query)
-
-def splunk_where_clause():
-    service = splunk_connect()
-    query = "search index=main | where status=200"
-    return service.jobs.create(query)
-
-def splunk_rex_extract():
-    service = splunk_connect()
-    query = "search index=main | rex \"user=(?<user>\\w+)\""
-    return service.jobs.create(query)
-
-def splunk_dedup_hosts():
-    service = splunk_connect()
-    query = "search index=main | dedup host"
-    return service.jobs.create(query)
-
-def splunk_sort_results():
-    service = splunk_connect()
-    query = "search index=main | sort - count"
-    return service.jobs.create(query)
-
-def splunk_lookup_example():
-    service = splunk_connect()
-    query = "search index=main | lookup user_lookup user OUTPUT role"
-    return service.jobs.create(query)
-
-def splunk_append_example():
-    service = splunk_connect()
-    query = "search index=main | append [ search index=backup ]"
-    return service.jobs.create(query)
-
-def splunk_transaction_example():
-    service = splunk_connect()
-    query = "search index=main | transaction user"
-    return service.jobs.create(query)
-
-def splunk_table_fields():
-    service = splunk_connect()
-    query = "search index=main | table host, source, sourcetype"
-    return service.jobs.create(query)
+def warn(msg: object, data: object = None):
+    logger.log_event(__get_event("WARN", msg, data))
