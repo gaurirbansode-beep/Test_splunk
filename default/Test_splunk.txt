@@ -1,9 +1,30 @@
-# Extracted Splunk logger functions
+def connect_service():
+    return client.connect(host="localhost", port=8089,
+                          username="admin", password="changeme")
+
+def build_search_query(index, keyword):
+    return f"search index={index} {keyword} | stats count"
 
 def submit_event(message):
     service = connect_service()
     service.indexes["main"].submit(message)
 
+def execute_search(query):
+    service = connect_service()
+    return service.jobs.create(query)
+
 def handle_and_submit(user, action):
     event = create_event(user, action)
     submit_event(format_payload(event))
+
+# Structured JSON Output
+{
+  "repository_processed": "gaurirbansode-beep/Test_splunk",
+  "source_file": "Test_splunk.txt",
+  "total_functions_detected": 11,
+  "splunk_functions_count": 5,
+  "non_splunk_functions_count": 6,
+  "output_repository": "gaurirbansode-beep/Test_splunk/default",
+  "output_file": "Test_splunk.txt",
+  "status": "SUCCESS"
+}
