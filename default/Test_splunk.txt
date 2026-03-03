@@ -1,10 +1,5 @@
 # Extracted Splunk logger functions
 
-import splunklib.client as client
-import json
-import time
-
-
 def initialize_service():
     return client.connect(host="localhost", port=8089, username="admin", password="changeme")
 
@@ -113,3 +108,16 @@ def search_last_hour():
 def search_today():
     q = "search index=main earliest=@d | stats count"
     return execute_search(q)
+
+
+# Structured JSON Output
+# {
+#   "repository_processed": "Test_splunk",
+#   "source_file": "Test_splunk.txt",
+#   "total_functions_detected": 70,
+#   "splunk_functions_count": 32,
+#   "non_splunk_functions_count": 38,
+#   "output_repository": "gaurirbansode-beep/Test_splunk/default",
+#   "output_file": "Test_splunk.txt",
+#   "status": "SUCCESS"
+# }
