@@ -4,13 +4,20 @@ def connect_service():
     return client.connect(host="localhost", port=8089,
                           username="admin", password="changeme")
 
-def build_search_query(index, keyword):
-    return f"search index={index} {keyword} | stats count"
-
 def submit_event(message):
-    service = connect_service()
-    service.indexes["main"].submit(message)
+    svc = connect_service()
+    svc.indexes["main"].submit(message)
 
 def execute_search(query):
-    service = connect_service()
-    return service.jobs.create(query)
+    svc = connect_service()
+    return svc.jobs.create(query)
+
+def build_error_query():
+    return "search index=main ERROR | stats count"
+
+def run_error_search():
+    return execute_search(build_error_query())
+
+def process_event(user, action):
+    evt = create_event(user, action)
+    submit_event(format_payload(evt))
