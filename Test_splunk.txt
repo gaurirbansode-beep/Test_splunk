@@ -1,283 +1,48 @@
 import logging
 import json
-import time
 import random
-import requests
 import splunklib.client as client
 
 
-def initialize_service():
-    return client.connect(host="localhost", port=8089, username="admin", password="changeme")
+def connect_service():
+    return client.connect(host="localhost", port=8089,
+                          username="admin", password="changeme")
 
-def build_query(index, condition):
-    return f"search index={index} {condition}"
+
+def build_search_query(index, keyword):
+    return f"search index={index} {keyword} | stats count"
+
 
 def submit_event(message):
-    svc = initialize_service()
-    svc.indexes["main"].submit(message)
+    service = connect_service()
+    service.indexes["main"].submit(message)
+
 
 def calculate_sum(a, b):
     return a + b
 
-def calculate_diff(a, b):
-    return a - b
 
-def calculate_product(a, b):
-    return a * b
+def generate_random_number():
+    return random.randint(1, 100)
 
-def calculate_division(a, b):
-    return a / b if b else None
 
-def generate_id():
-    return random.randint(1000, 9999)
+def format_payload(data):
+    return json.dumps(data)
 
-def format_message(level, msg):
-    return f"{level.upper()}: {msg}"
-
-def log_local(message):
-    logging.getLogger("app").info(message)
-
-def fetch_remote_data(url):
-    return requests.get(url).json()
-
-def parse_payload(data):
-    return json.loads(data)
-
-def transform_payload(data):
-    return {k: str(v).upper() for k, v in data.items()}
-
-def persist_event(event):
-    submit_event(json.dumps(event))
 
 def execute_search(query):
-    svc = initialize_service()
-    return svc.jobs.create(query)
+    service = connect_service()
+    return service.jobs.create(query)
 
-def search_error_events():
-    q = "search index=main ERROR | stats count"
-    return execute_search(q)
 
-def search_by_host(host):
-    q = f"search index=main host={host} | stats count"
-    return execute_search(q)
+def log_local_info(message):
+    logging.getLogger("app").info(message)
 
-def search_with_time():
-    q = "search index=main | timechart count"
-    return execute_search(q)
-
-def calculate_average(values):
-    return sum(values) / len(values) if values else 0
-
-def max_value(values):
-    return max(values)
-
-def min_value(values):
-    return min(values)
-
-def normalize_text(text):
-    return text.strip().lower()
-
-def uppercase_text(text):
-    return text.upper()
-
-def reverse_text(text):
-    return text[::-1]
 
 def create_event(user, action):
-    return {"user": user, "action": action, "timestamp": time.time()}
+    return {"user": user, "action": action}
 
-def handle_event(user, action):
-    evt = create_event(user, action)
-    persist_event(evt)
 
-def conditional_eval(value):
-    q = f"search index=main | eval status=if(count>{value},\"high\",\"low\")"
-    return execute_search(q)
-
-def filter_even(nums):
-    return [n for n in nums if n % 2 == 0]
-
-def filter_odd(nums):
-    return [n for n in nums if n % 2 != 0]
-
-def merge_dict(a, b):
-    return {**a, **b}
-
-def check_status(code):
-    return code == 200
-
-def log_warning(message):
-    logging.getLogger("app").warning(message)
-
-def log_error(message):
-    logging.getLogger("app").error(message)
-
-def submit_error(error):
-    submit_event(format_message("error", error))
-
-def submit_info(info):
-    submit_event(format_message("info", info))
-
-def fetch_users(conn):
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM users")
-    return cur.fetchall()
-
-def compute_square(n):
-    return n * n
-
-def compute_cube(n):
-    return n ** 3
-
-def search_with_lookup():
-    q = "search index=main | lookup user_lookup user OUTPUT role"
-    return execute_search(q)
-
-def append_search():
-    q = "search index=main | append [ search index=backup ]"
-    return execute_search(q)
-
-def transaction_search():
-    q = "search index=main | transaction user"
-    return execute_search(q)
-
-def dedup_hosts():
-    q = "search index=main | dedup host"
-    return execute_search(q)
-
-def sort_results():
-    q = "search index=main | sort - count"
-    return execute_search(q)
-
-def rare_hosts():
-    q = "search index=main | rare host"
-    return execute_search(q)
-
-def top_hosts():
-    q = "search index=main | top host"
-    return execute_search(q)
-
-def table_view():
-    q = "search index=main | table host, source"
-    return execute_search(q)
-
-def rex_extract():
-    q = "search index=main | rex \"user=(?<user>\\w+)\""
-    return execute_search(q)
-
-def build_complex_query(index, field):
-    return f"search index={index} | stats count by {field}"
-
-def execute_complex(index, field):
-    return execute_search(build_complex_query(index, field))
-
-def save_to_disk(name, content):
-    with open(name, "w") as f:
-        f.write(content)
-
-def read_from_disk(name):
-    with open(name, "r") as f:
-        return f.read()
-
-def cleanup_text(text):
-    return text.replace("\n", " ").strip()
-
-def compute_percentage(a, b):
-    return (a / b) * 100 if b else 0
-
-def validate_user(user):
-    return bool(user)
-
-def process_batch(events):
-    for e in events:
-        persist_event(e)
-
-def random_choice(items):
-    return random.choice(items)
-
-def generate_token():
-    return str(random.random())
-
-def audit_action(user, action):
-    evt = create_event(user, action)
-    persist_event(evt)
-
-def search_custom(condition):
-    q = build_query("main", condition)
-    return execute_search(q)
-
-def aggregate_by_source():
-    q = "search index=main | stats count by source"
-    return execute_search(q)
-
-def aggregate_by_type():
-    q = "search index=main | stats count by sourcetype"
-    return execute_search(q)
-
-def calculate_median(values):
-    s = sorted(values)
-    mid = len(s)//2
-    return s[mid]
-
-def check_threshold(value, limit):
-    return value > limit
-
-def trigger_alert(message):
-    submit_event(format_message("alert", message))
-
-def track_metric(metric, value):
-    evt = {"metric": metric, "value": value}
-    persist_event(evt)
-
-def search_metrics():
-    q = "search index=main metric=* | stats avg(value)"
-    return execute_search(q)
-
-def health_check():
-    return True
-
-def finalize():
-    return "done"
-
-def noop():
-    pass
-
-def combine_strings(a, b):
-    return a + b
-
-def count_items(items):
-    return len(items)
-
-def ping_service():
-    return initialize_service() is not None
-
-def build_error_query():
-    return "search index=main ERROR | table host, source"
-
-def execute_error_table():
-    return execute_search(build_error_query())
-
-def search_last_hour():
-    q = "search index=main earliest=-1h | stats count"
-    return execute_search(q)
-
-def search_today():
-    q = "search index=main earliest=@d | stats count"
-    return execute_search(q)
-
-def log_debug(message):
-    logging.getLogger("app").debug(message)
-
-def structured_event(user, action, status):
-    return {"user": user, "action": action, "status": status}
-
-def send_structured_event(user, action, status):
-    evt = structured_event(user, action, status)
-    persist_event(evt)
-
-def calculate_variance(values):
-    avg = calculate_average(values)
-    return sum((x-avg)**2 for x in values)/len(values)
-
-def calculate_std(values):
-    return calculate_variance(values) ** 0.5
+def handle_and_submit(user, action):
+    event = create_event(user, action)
+    submit_event(format_payload(event))
