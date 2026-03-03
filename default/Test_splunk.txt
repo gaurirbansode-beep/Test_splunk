@@ -1,14 +1,5 @@
 # Extracted Splunk logger functions
 
-def __Get_t(log_level, msg, data=None):
-    event = {"level": log_level, "message": msg}
-    if isinstance(data, dict):
-        event.update(data)
-    elif isinstance(data, str) and data.strip():
-        event["data"] = data
-    event.update(log_data)
-    return json.dumps(event)
-
 def debug(msg: object, data: object = None):
     logger.log_event(__get_event("DEBUG", msg, data))
 
