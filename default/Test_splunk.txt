@@ -1,5 +1,10 @@
 # Extracted Splunk logger functions
 
+import splunklib.client as client
+import json
+import time
+
+
 def initialize_service():
     return client.connect(host="localhost", port=8089, username="admin", password="changeme")
 
