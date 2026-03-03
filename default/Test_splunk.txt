@@ -72,7 +72,7 @@ def log_and_write_parquet_data(
 ) -> None:
     try:
         info(
-            f"Uploading {log_data['job_name']}",
+            f"Uploading {log_data['job_name']}" ,
             data={
                 "dest": destination_path,
                 "task": log_data["task"],
@@ -83,7 +83,7 @@ def log_and_write_parquet_data(
         log_data["df_count"] = upload_count
         write_parquet_data(df, destination_path, log_data)
         info(
-            f"Done uploading {log_data['job_name']}",
+            f"Done uploading {log_data['job_name']}" ,
             data={
                 "task": log_data["task"],
                 "state": STATE_FINISHED,
@@ -105,3 +105,16 @@ def log_and_write_parquet_data(
             },
         )
         raise e
+
+
+# Structured JSON Output
+{
+  "repository_processed": "gaurirbansode-beep/Test_splunk",
+  "source_file": "default/Test_splunk.txt",
+  "total_functions_detected": 8,
+  "splunk_functions_count": 8,
+  "non_splunk_functions_count": 0,
+  "output_repository": "gaurirbansode-beep/Test_splunk",
+  "output_file": "default/Test_splunk.txt",
+  "status": "SUCCESS"
+}
