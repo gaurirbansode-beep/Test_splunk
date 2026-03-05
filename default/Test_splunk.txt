@@ -1,5 +1,4 @@
-# Splunk-related logger functions extracted from Test_splunk.txt
-
+splunk_secret = get_secret(splunk_secret_name)
 logger = SplunkLogger(
     token=splunk_secret["token"],
     index=splunk_secret["index"],
@@ -20,26 +19,20 @@ def __get_event(log_level, msg, data={}):
     event.update(log_data)
     return json.dumps(event)
 
-
 def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
-
 
 def info(msg: object, data: object = {}):
     logger.log_event(__get_event("INFO", msg, data))
 
-
 def warn(msg: object, data: object = {}):
     logger.log_event(__get_event("WARN", msg, data))
-
 
 def error(msg: object, data: object = {}):
     logger.log_event(__get_event("ERROR", msg, data))
 
-
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
-
 
 print(__get_event("INFO", f"splunk logger initialized for {env} env"))
 info(f"splunk logger initialized for {env} env")
@@ -96,18 +89,11 @@ def logging_wrapper(task, error_msg):
 
     return inner
 
-# Example Splunk-related function using logging_wrapper
-@logging_wrapper(TASK_LOAD_ALPACA, "Could not load alpaca")
-def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
-    return (
-        get_unity_data(alpaca_source)
-        .where(F.col("purposeId").isin(purposes))
-        .select(F.col("deviceId").alias("device_uuid"))
-    )
 
-# Summary
-{
-  "total_functions": 40,
-  "total_splunk_functions": 13,
-  "total_non_splunk_functions": 27
+# Summary of counts
+summary = {
+    "total_functions": 35,
+    "total_splunk_functions": 8,
+    "total_non_splunk_functions": 27
 }
+print(summary)
