@@ -1,3 +1,15 @@
+# Splunk-related logger functions extracted from Test_splunk.txt
+
+logger = SplunkLogger(
+    token=splunk_secret["token"],
+    index=splunk_secret["index"],
+    meta_data={
+        "source": source_name,
+        "sourcetype": f"databricks:{source_type}",
+        "host": databricks_host,
+    },
+)
+
 def __get_event(log_level, msg, data={}):
     # adding log level and msg to event
     event = {"level": log_level, "message": msg}
@@ -32,6 +44,8 @@ def fatal(msg: object, data: object = {}):
 print(__get_event("INFO", f"splunk logger initialized for {env} env"))
 info(f"splunk logger initialized for {env} env")
 
+class SourceEmptyException(Exception):
+    pass
 
 def logging_wrapper(task, error_msg):
     def inner(func):
@@ -82,77 +96,18 @@ def logging_wrapper(task, error_msg):
 
     return inner
 
+# Example Splunk-related function using logging_wrapper
+@logging_wrapper(TASK_LOAD_ALPACA, "Could not load alpaca")
+def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
+    return (
+        get_unity_data(alpaca_source)
+        .where(F.col("purposeId").isin(purposes))
+        .select(F.col("deviceId").alias("device_uuid"))
+    )
 
-def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
-    try:
-        info(
-            f"Starting {log_data['task']}",
-            data={
-                "task": log_data["task"],
-                "state": STATE_STARTED,
-            },
-        )
-        if source_info["format"] == "parquet":
-            df = get_parquet_data(
-                source_info["path"],
-                source_info.get("partition_string"),
-                source_info.get("retain_partition_columns"),
-            )
-        elif source_info["format"] == "delta":
-            df = get_delta_data(source_info["path"])
-        elif source_info["format"] == "csv":
-            df = get_csv_data(source_info["path"], source_info["separator"])
-        elif source_info["format"] == "unity":
-            df = get_unity_data(source_info["path"])
-        elif source_info["format"] == "redshift":
-            df = get_redshift_data(
-                source_info["constants"], source_info["create_session"]
-            )
-        elif source_info["format"] == "metastore":
-            if source_info["using_sql"] == True:
-                df = spark.sql(source_info["metastore_query"])
-            else:
-                df = spark.table(source_info["database"] + "." + source_info["table"])
-        else:
-            df = spark.read.format(source_info["format"]).load(source_info["path"])
-       
-        info(
-            f"Finished {log_data['task']}",
-            data={
-                "task": log_data["task"],
-                "state": STATE_FINISHED,
-                "rows": df.count(),
-            },
-        )
-        return df
-    except AnalysisException as e:
-        error(
-            log_data["error_msg"],
-            data={
-                "task": log_data["task"],
-                "dump": str(e),
-                "state": STATE_ERROR,
-            },
-        )
-        if str(e).startswith("Path does not exist:"):
-            raise SourceEmptyException()
-        else:
-            raise e
-    except Exception as e:
-        error(
-            log_data["error_msg"],
-            data={
-                "task": log_data["task"],
-                "dump": str(e),
-                "state": STATE_ERROR,
-            },
-        )
-        raise e
-
-
-# Summary:
+# Summary
 {
-  "total_functions": 33,
+  "total_functions": 40,
   "total_splunk_functions": 13,
-  "total_non_splunk_functions": 20
+  "total_non_splunk_functions": 27
 }
