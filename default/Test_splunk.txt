@@ -1,4 +1,16 @@
-def __Get_t(log_level, msg, data=None):
+# Splunk-related logger functions extracted from Test_splunk.txt
+
+logger = SplunkLogger(
+    token=splunk_secret["token"],
+    index=splunk_secret["index"],
+    meta_data={
+        "source": source_name,
+        "sourcetype": f"databricks:{source_type}",
+        "host": databricks_host,
+    },
+)
+
+def __get_event(log_level, msg, data={}):
     event = {"level": log_level, "message": msg}
     if isinstance(data, dict):
         event.update(data)
@@ -7,78 +19,151 @@ def __Get_t(log_level, msg, data=None):
     event.update(log_data)
     return json.dumps(event)
 
-def debug(msg: object, data: object = None):
+def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
 
-def info(msg: object, data: object = None):
+def info(msg: object, data: object = {}):
     logger.log_event(__get_event("INFO", msg, data))
 
-def warn(msg: object, data: object = None):
+def warn(msg: object, data: object = {}):
     logger.log_event(__get_event("WARN", msg, data))
 
-def error(msg: object, data: object = None):
+def error(msg: object, data: object = {}):
     logger.log_event(__get_event("ERROR", msg, data))
 
-def fatal(msg: object, data: object = None):
+def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
+
+print(__get_event("INFO", f"splunk logger initialized for {env} env"))
+info(f"splunk logger initialized for {env} env")
+
+class SourceEmptyException(Exception):
+    pass
 
 def logging_wrapper(task, error_msg):
     def inner(func):
         def wrapper(*args, **kwargs):
             try:
-                info(f"Wrapper starting {task}", data={"task": task, "state": STATE_STARTED})
+                info(
+                    f"Wrapper starting {task}",
+                    data={
+                        "task": task,
+                        "state": STATE_STARTED,
+                    },
+                )
                 df = func(*args, **kwargs)
-                info(f"Wrapper finished {task}", data={"task": task, "state": STATE_FINISHED})
+                info(
+                    f"Wrapper finished {task}",
+                    data={
+                        "task": task,
+                        "state": STATE_FINISHED,
+                    },
+                )
                 return df
             except AnalysisException as e:
-                error(error_msg, data={"task": task, "dump": str(e), "state": STATE_ERROR})
+                error(
+                    error_msg,
+                    data={
+                        "task": task,
+                        "dump": str(e),
+                        "state": STATE_ERROR,
+                    },
+                )
                 if str(e).startswith("Path does not exist:"):
                     raise SourceEmptyException()
                 else:
                     raise
             except:
                 e = sys.exc_info()[0]
-                error(error_msg, data={"task": task, "dump": str(e), "state": STATE_ERROR})
+                error(
+                    error_msg,
+                    data={
+                        "task": task,
+                        "dump": str(e),
+                        "state": STATE_ERROR,
+                    },
+                )
                 raise
         return wrapper
     return inner
 
-def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
-    if log_data["df_count"] != 0:
-        df.write.mode("overwrite").option("compression", "snappy").parquet(destination_path)
-    else:
-        error("Could not write to destination as dataframe having zero records", data={"task": log_data["task"], "dest": destination_path, "state": STATE_ERROR})
-        raise Exception("Could not write to destination as dataframe having zero records")
-
-def log_and_write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
+def log_and_write_parquet_data(
+    df: DataFrame, destination_path: str, log_data: dict
+) -> None:
     try:
-        info(f"Uploading {log_data['job_name']}", data={"dest": destination_path, "task": log_data["task"], "state": STATE_STARTED})
+        info(
+            f"Uploading {log_data['job_name']}",
+            data={
+                "dest": destination_path,
+                "task": log_data["task"],
+                "state": STATE_STARTED,
+            },
+        )
         upload_count = df.count()
         log_data["df_count"] = upload_count
         write_parquet_data(df, destination_path, log_data)
-        info(f"Done uploading {log_data['job_name']}", data={"task": log_data["task"], "state": STATE_FINISHED, "rows": upload_count, "document_type": log_data.get("document_type", "Not Applicable For this job")})
-        logger.flush()
+        info(
+            f"Done uploading {log_data['job_name']}",
+            data={
+                "task": log_data["task"],
+                "state": STATE_FINISHED,
+                "rows": upload_count,
+                "document_type": log_data.get(
+                    "document_type", "Not Applicable For this job"
+                ),
+            },
+        )
     except Exception as e:
-        error("Could not write to destination", data={"task": log_data["task"], "dest": destination_path, "dump": str(e), "state": STATE_ERROR})
+        error(
+            "Could not write to destination",
+            data={
+                "task": log_data["task"],
+                "dest": destination_path,
+                "dump": str(e),
+                "state": STATE_ERROR,
+            },
+        )
         raise e
 
-def log_and_write_delta_table(df: DataFrame, destination: str, log_data: dict) -> None:
+def log_and_write_delta_table(
+    df: DataFrame, destination_path: str, log_data: dict
+) -> None:
     try:
-        info(f"Writing delta table at {destination}", data={"task": log_data["task"], "destination": destination, "state": STATE_STARTED})
+        info(
+            f"Writing delta table at {destination_path}",
+            data={
+                "task": log_data["task"],
+                "destination": destination_path,
+                "state": STATE_STARTED,
+            },
+        )
         upload_count = df.count()
         log_data["df_count"] = upload_count
-        write_delta_table(log_data, df, destination)
-        logger.flush()
+        write_delta_data(df, destination_path, log_data)
+        deltaTable = DeltaTable.forName(spark, destination_path)
+        info(
+            f"Done writing delta table at {destination_path}",
+            data={
+                "task": log_data["task"],
+                "state": STATE_FINISHED,
+                "metrics": get_delta_metrics(deltaTable),
+                "document_type": log_data.get(
+                    "document_type", "Not Applicable For this job"
+                ),
+            },
+        )
+        deltaTable.optimize().executeCompaction()
     except Exception as e:
-        error(f"Could not write to {destination}", data={"task": log_data["task"], "dest": destination, "dump": str(e), "state": STATE_ERROR})
+        error(
+            f"Could not write to {destination_path}",
+            data={
+                "task": log_data["task"],
+                "dest": destination_path,
+                "dump": str(e),
+                "state": STATE_ERROR,
+            },
+        )
         raise e
 
-def write_unity_data(df: DataFrame, destination_path: str, log_data: dict,mode:str ="overwrite") -> None:
-    if log_data["df_count"] != 0:
-        df.write.format("delta").mode(mode).option("overwriteSchema", "true").saveAsTable(destination_path)
-    else:
-        error("Could not write to destination as dataframe having zero records", data={"task": log_data["task"], "dest": destination_path, "state": STATE_ERROR})
-        raise Exception("Could not write to destination as dataframe having zero records")
-
-# Summary of counts:
-{"total_functions": 6, "total_splunk_functions": 6, "total_non_splunk_functions": 0}
+# Summary
+{"total_functions": 23, "total_splunk_functions": 11, "total_non_splunk_functions": 12}
