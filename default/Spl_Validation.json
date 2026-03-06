@@ -1,48 +1,40 @@
 {
-  "validation_status": "PASS",
-  "summary": "All extracted Splunk logger functions match the reference knowledge base patterns. No non-Splunk logs or missing functions were found. Formatting and syntax are correct.",
+  "validation_status": "PARTIAL",
+  "summary": "Validation is partial due to missing reference knowledge base. Most extracted functions follow Splunk logger patterns, using SplunkLogger and log_event. Some supporting functions and exception handling are not directly related to Splunk logging. No hallucinated patterns found.",
   "validated_output": {
-    "original_output": "logger = SplunkLogger(\n    token=splunk_secret[\"token\"],\n    index=splunk_secret[\"index\"],\n    meta_data={\n        \"source\": source_name,\n        \"sourcetype\": f\"databricks:{source_type}\",\n        \"host\": databricks_host,\n    },\n)\n\ndef __get_event(log_level, msg, data={}) :\n    event = {\"level\": log_level, \"message\": msg}\n    if isinstance(data, dict):\n        event.update(data)\n    elif isinstance(data, str) and data.strip():\n        event[\"data\"] = data\n    event.update(log_data)\n    return json.dumps(event)\n\ndef debug(msg: object, data: object = {}) :\n    logger.log_event(__get_event(\"DEBUG\", msg, data))\n\ndef info(msg: object, data: object = {}) :\n    logger.log_event(__get_event(\"INFO\", msg, data))\n\ndef warn(msg: object, data: object = {}) :\n    logger.log_event(__get_event(\"WARN\", msg, data))\n\ndef error(msg: object, data: object = {}) :\n    logger.log_event(__get_event(\"ERROR\", msg, data))\n\ndef fatal(msg: object, data: object = {}) :\n    logger.log_event(__get_event(\"FATAL\", msg, data))\n\nprint(__get_event(\"INFO\", f\"splunk logger initialized for {env} env\"))\ninfo(f\"splunk logger initialized for {env} env\")\n\nclass SourceEmptyException(Exception):\n    pass\n\ndef logging_wrapper(task, error_msg):\n    def inner(func):\n        def wrapper(*args, **kwargs):\n            try:\n                info(\n                    f\"Wrapper starting {task}\",\n                    data={\n                        \"task\": task,\n                        \"state\": STATE_STARTED,\n                    },\n                )\n                df = func(*args, **kwargs)\n                info(\n                    f\"Wrapper finished {task}\",\n                    data={\n                        \"task\": task,\n                        \"state\": STATE_FINISHED,\n                    },\n                )\n                return df\n            except AnalysisException as e:\n                error(\n                    error_msg,\n                    data={\n                        \"task\": task,\n                        \"dump\": str(e),\n                        \"state\": STATE_ERROR,\n                    },\n                )\n                if str(e).startswith(\"Path does not exist:\"):\n                    raise SourceEmptyException()\n                else:\n                    raise\n            except:\n                e = sys.exc_info()[0]\n                error(\n                    error_msg,\n                    data={\n                        \"task\": task,\n                        \"dump\": str(e),\n                        \"state\": STATE_ERROR,\n                    },\n                )\n                raise\n        return wrapper\n    return inner\n\ndef log_and_write_parquet_data(\n    df: DataFrame, destination_path: str, log_data: dict\n) -> None:\n    try:\n        info(\n            f\"Uploading {log_data['job_name']}\",\n            data={\n                \"dest\": destination_path,\n                \"task\": log_data[\"task\"],\n                \"state\": STATE_STARTED,\n            },\n        )\n        upload_count = df.count()\n        log_data[\"df_count\"] = upload_count\n        write_parquet_data(df, destination_path, log_data)\n        info(\n            f\"Done uploading {log_data['job_name']}\",\n            data={\n                \"task\": log_data[\"task\"],\n                \"state\": STATE_FINISHED,\n                \"rows\": upload_count,\n                \"document_type\": log_data.get(\n                    \"document_type\", \"Not Applicable For this job\"\n                ),\n            },\n        )\n    except Exception as e:\n        error(\n            \"Could not write to destination\",\n            data={\n                \"task\": log_data[\"task\"],\n                \"dest\": destination_path,\n                \"dump\": str(e),\n                \"state\": STATE_ERROR,\n            },\n        )\n        raise e\n\ndef log_and_write_delta_table(\n    df: DataFrame, destination_path: str, log_data: dict\n) -> None:\n    try:\n        info(\n            f\"Writing delta table at {destination_path}\",\n            data={\n                \"task\": log_data[\"task\"],\n                \"destination\": destination_path,\n                \"state\": STATE_STARTED,\n            },\n        )\n        upload_count = df.count()\n        log_data[\"df_count\"] = upload_count\n        write_delta_data(df, destination_path, log_data)\n        deltaTable = DeltaTable.forName(spark, destination_path)\n        info(\n            f\"Done writing delta table at {destination_path}\",\n            data={\n                \"task\": log_data[\"task\"],\n                \"state\": STATE_FINISHED,\n                \"metrics\": get_delta_metrics(deltaTable),\n                \"document_type\": log_data.get(\n                    \"document_type\", \"Not Applicable For this job\"\n                ),\n            },\n        )\n        deltaTable.optimize().executeCompaction()\n    except Exception as e:\n        error(\n            f\"Could not write to {destination_path}\",\n            data={\n                \"task\": log_data[\"task\"],\n                \"dest\": destination_path,\n                \"dump\": str(e),\n                \"state\": STATE_ERROR,\n            },\n        )\n        raise e\n\n# Summary\n{"total_functions": 23, "total_splunk_functions": 11, "total_non_splunk_functions": 12}\n",
-    "corrected_output": ""
+    "original_output": "SplunkLogger initialization and log_event usage for debug, info, warn, error, fatal; wrapper and data writing functions use info/error logging.",
+    "corrected_output": "logger = SplunkLogger(...)
+def debug(msg, data={}): logger.log_event(__get_event('DEBUG', msg, data))
+def info(msg, data={}): logger.log_event(__get_event('INFO', msg, data))
+def warn(msg, data={}): logger.log_event(__get_event('WARN', msg, data))
+def error(msg, data={}): logger.log_event(__get_event('ERROR', msg, data))
+def fatal(msg, data={}): logger.log_event(__get_event('FATAL', msg, data))"
   },
   "checks_performed": [
     {
       "check_id": "CHECK_01",
-      "description": "Verify if extracted functions match Splunk logger patterns.",
-      "reference_source": "Reference Knowledge Base/section: Splunk Logger Patterns and Functions",
-      "result": "PASS",
-      "details": "All extracted functions match the canonical Splunk logger patterns."
-    },
-    {
-      "check_id": "CHECK_02",
-      "description": "Check for non-Splunk logs incorrectly extracted.",
-      "reference_source": "Reference Knowledge Base/section: Splunk Logger Patterns and Functions",
-      "result": "PASS",
-      "details": "No non-Splunk logs were found in the extracted output."
-    },
-    {
-      "check_id": "CHECK_03",
-      "description": "Check for missing important Splunk logging functions.",
-      "reference_source": "Reference Knowledge Base/section: Splunk Logger Patterns and Functions",
-      "result": "PASS",
-      "details": "All important Splunk logging functions are present."
-    },
-    {
-      "check_id": "CHECK_04",
-      "description": "Check format and syntax alignment with reference patterns.",
-      "reference_source": "Reference Knowledge Base/section: Splunk Logger Patterns and Functions",
-      "result": "PASS",
-      "details": "Format and syntax of extracted functions align with reference patterns."
+      "description": "Verify if extracted functions match Splunk logger patterns (SplunkLogger, log_event, log levels).",
+      "reference_source": "Reference Knowledge Base (missing)",
+      "result": "PARTIAL",
+      "details": "Logger initialization and log_event usage match expected Splunk patterns, but reference file is missing. Supporting functions are not directly Splunk logging."
     }
   ],
-  "issues_found": [],
-  "confidence_score": 1.0,
+  "issues_found": [
+    {
+      "issue_id": "ISSUE_01",
+      "type": "MISSING_INFO",
+      "description": "Reference knowledge base file not found, so full validation cannot be performed.",
+      "expected_value": "Reference patterns for Splunk logging",
+      "actual_value": "Not available"
+    }
+  ],
+  "confidence_score": 0.7,
   "references_used": [
     {
-      "document": "Reference Knowledge Base",
-      "section": "Splunk Logger Patterns and Functions",
-      "snippet": "def info(msg: object, data: object = None):\n    logger.log_event(__get_event(\"INFO\", msg, data))"
+      "document": "default/Test_splunk.txt",
+      "section": "SplunkLogger initialization and log_event usage",
+      "snippet": "logger = SplunkLogger(...); logger.log_event(__get_event(...))"
     }
   ],
-  "recommendation": "ACCEPT"
+  "recommendation": "REVISE"
 }
